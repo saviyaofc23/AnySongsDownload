@@ -1,15 +1,17 @@
 import telebot
 import yt_dlp
 import os
+import re
 
-# Replace with your Telegram Bot API token from BotFather
-TOKEN = '7842155146:AAHjtET6lqzpJyXaEPWWUfv4uCweaisctL4'
-
+# Telegram Bot API Token එක ඇතුල් කරන්න
+TOKEN = '8040959085:AAHJA4vGcg4zlPQoRZ1ZhOioY09geDqtCOU'
 bot = telebot.TeleBot(TOKEN)
 
-# Function to download audio from YouTube
+# ගීත ඩවුන්ලෝඩ් කිරීම සඳහා ගොනු ගබඩා ස්ථානය
+DOWNLOAD_DIR = 'downloads/'
+
+# YouTube වෙතින් අසුර හෝ MP3 එකක් ඩවුන්ලෝඩ් කිරීමේ ක්‍රියාවලිය
 def download_audio(youtube_url):
-    # yt-dlp options for downloading audio
     ydl_opts = {
         'format': 'bestaudio/best',
         'postprocessors': [{
@@ -17,38 +19,44 @@ def download_audio(youtube_url):
             'preferredcodec': 'mp3',
             'preferredquality': '192',
         }],
-        'outtmpl': 'downloads/%(title)s.%(ext)s',  # Save file in 'downloads' folder
+        'outtmpl': f'{DOWNLOAD_DIR}%(title)s.%(ext)s',  # 'downloads' ෆෝල්ඩරයට ගොනු සුරැකීම
         'quiet': True,
     }
-    
-    # Download the audio
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info_dict = ydl.extract_info(youtube_url, download=True)
-        filename = ydl.prepare_filename(info_dict)
-        return filename
 
-# Command handler for the '/start' command
+    try:
+        # yt-dlp භාවිතා කර audio එක ඩවුන්ලෝඩ් කරයි
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info_dict = ydl.extract_info(youtube_url, download=True)
+            filename = ydl.prepare_filename(info_dict)
+            return filename
+    except Exception as e:
+        print(f"Error: {e}")
+        return None
+
+# '/start' අණය සඳහා කේතය
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    bot.reply_to(message, "Welcome to the Any Songs yt Download Bot! Send me a YouTube URL, and I'll send you the audio.")
+    bot.reply_to(message, "Welcome To Any Songs YouTube Music Download Bot 🎧! Send Me Your YouTube URL.")
 
-# Handle user input (YouTube URL) and download audio
+# පරිශීලකයාගේ පණිවිඩය සැකසීම
 @bot.message_handler(func=lambda message: True)
-def send_music(message):
-    youtube_url = message.text
-    
-    # Validate the URL
-    if 'youtube.com' in youtube_url or 'youtu.be' in youtube_url:
-        bot.reply_to(message, "Downloading your song... please wait.")
-        try:
-            # Download the audio and send it to the user
-            audio_file = download_audio(youtube_url)
-            bot.send_audio(message.chat.id, open(audio_file, 'rb'))
-            os.remove(audio_file)  # Clean up the downloaded file after sending
-        except Exception as e:
-            bot.reply_to(message, f"Error: {e}")
-    else:
-        bot.reply_to(message, "Please send a valid YouTube URL.")
+def download_media(message):
+    youtube_url = message.text.strip()
 
-# Start the bot
+    # YouTube URL එකක් දැක්කා නම්
+    if re.match(r'(https?://)?(www\.)?(youtube|youtu|youtube-nocookie)\.(com|be)/.*', youtube_url):
+        bot.reply_to(message, "Downloading Content... Please Wait.")
+
+        # ගීත එකක් ඩවුන්ලෝඩ් කිරීම
+        audio_file = download_audio(youtube_url)
+        if audio_file:
+            bot.send_audio(message.chat.id, open(audio_file, 'rb'))
+            os.remove(audio_file)  # ගොනුව පවසන්නන්ට පසු මකා දැමීම
+        else:
+            bot.reply_to(message, "Download Error.")
+
+    else:
+        bot.reply_to(message, "Enter Correct YouTube URL.")
+
+# බොට් ආරම්භ කිරීම
 bot.polling()
